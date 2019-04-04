@@ -1,6 +1,6 @@
 ;;; gn-mode.el --- major mode for editing GN (generate ninja) files
 
-;; Copyright (c) 2018 Emily Backes
+;; Copyright (c) 2018-2019 Emily Backes
 
 ;; Author: Emily Backes <lucca@accela.net>
 ;; Maintainer: Emily Backes <lucca@accela.net>
@@ -46,7 +46,10 @@
 
 ;;; Commentary:
 
-;; This defines a new major mode for editing GN config files.
+;; This defines a major-mode for editing GN (ninja generator) config
+;; files in Emacs.  Files of this type (e.g. BUILD.gn or *.gni) are
+;; common in Chromium-derived projects like Google Chrome and
+;; Microsoft Edge (Anaheim).
 
 ;;; Code:
 
@@ -79,7 +82,7 @@
 (defcustom gn-indent-method #'gn-indent-line
   "Select single-line indentation methodology."
   :type '(radio (function-item #'gn-indent-line)
-		(function-item #'gn-indent-line-inductive))
+                (function-item #'gn-indent-line-inductive))
   :group 'gn
   :risky t)
 
@@ -135,7 +138,7 @@ Use `gn-idle-help` to disable this entirely."
 
 (defface gn-tab-face
   '((t (:inherit font-lock-warning-face
-		 :background "red")))
+                 :background "red")))
   "Face for tab characters, which GN disallows."
   :group 'gn-faces)
 
@@ -154,8 +157,55 @@ Use `gn-idle-help` to disable this entirely."
   "Face for gn values in string expansions."
   :group 'gn-faces)
 
+;; cf. "gn help" in the "Target declarations" section
+(defvar gn-target-declarations
+  '(("action" "Declare a target that runs a script a single time.")
+    ("action_foreach" "Declare a target that runs a script over a set of files.")
+    ("bundle_data" "[iOS/macOS] Declare a target without output.")
+    ("copy" "Declare a target that copies files.")
+    ("create_bundle" "[iOS/macOS] Build an iOS or macOS bundle.")
+    ("executable" "Declare an executable target.")
+    ("group" "Declare a named group of targets.")
+    ("loadable_module" "Declare a loadable module target.")
+    ("shared_library" "Declare a shared library target.")
+    ("source_set" "Declare a source set target.")
+    ("static_library" "Declare a static library target.")
+    ("target" "Declare an target with the given programmatic type."))
+  "A list of target declarations for GN, and help data.")
+
+;; cf. "gn help" in the "Buildfile functions" section
+(defvar gn-buildfile-functions
+  '(("assert" "Assert an expression is true at generation time.")
+    ("config" "Defines a configuration object.")
+    ("declare_args" "Declare build arguments.")
+    ("defined" "Returns whether an identifier is defined.")
+    ("exec_script" "Synchronously run a script and return the output.")
+    ("foreach" "Iterate over a list.")
+    ("forward_variables_from" "Copies variables from a different scope.")
+    ("get_label_info" "Get an attribute from a target's label.")
+    ("get_path_info" "Extract parts of a file or directory name.")
+    ("get_target_outputs" "[file list] Get the list of outputs from a target.")
+    ("getenv" "Get an environment variable.")
+    ("import" "Import a file into the current scope.")
+    ("not_needed" "Mark variables from scope as not needed.")
+    ("pool" "Defines a pool object.")
+    ("print" "Prints to the console.")
+    ("process_file_template" "Do template expansion over a list of files.")
+    ("read_file" "Read a file into a variable.")
+    ("rebase_path" "Rebase a file or directory to another location.")
+    ("set_default_toolchain" "Sets the default toolchain name.")
+    ("set_defaults" "Set default values for a target type.")
+    ("set_sources_assignment_filter" "Set a pattern to filter source files.")
+    ("split_list" "Splits a list into N different sub-lists.")
+    ("string_replace" "Replaces substring in the given string.")
+    ("template" "Define a template rule.")
+    ("tool" "Specify arguments to a toolchain tool.")
+    ("toolchain" "Defines a toolchain.")
+    ("write_file" "Write a file to disk."))
+  "A list of buildfile functions for GN, and help data.")
+
 ;; cf. "gn help" in the "Built-in predefined variables" section
-(defvar gn-builtins
+(defvar gn-builtin-variables
   '(("current_cpu" "[string]" "The processor architecture of the current toolchain.")
     ("current_os" "[string]" "The operating system of the current toolchain.")
     ("current_toolchain" "[string]" "Label of the current toolchain.")
@@ -175,7 +225,7 @@ Use `gn-idle-help` to disable this entirely."
   "A list of builtin variables for GN, and help data.")
 
 ;; cf. "gn help" in the "Variables you set in targets" section
-(defvar gn-variables
+(defvar gn-target-variables
   '(("all_dependent_configs" "[label list]" "Configs to be forced on dependents.")
     ("allow_circular_includes_from" "[label list]" "Permit includes from deps.")
     ("arflags" "[string list]" "Arguments passed to static_library archiver.")
@@ -233,18 +283,39 @@ Use `gn-idle-help` to disable this entirely."
     ("write_runtime_deps" "[]" "Writes the target's runtime_deps to the given path.")
     ("xcode_extra_attributes" "[scope]" "Extra attributes for Xcode projects.")
     ("test_application_name" "[string]" "Test application name for unit or ui test target."))
-  "A list of settable variables for GN, and help data.")
+  "A list of target-related variables for GN, and help data.")
+
+;; cf. "gn help syntax"
+(defvar gn-raw-syntax-keywords
+  '(("if" "if ( condition ) { ... } [else...]")
+    ("else" "else if ... OR else { ... }")
+    ("true" "Boolean true")
+    ("false" "Boolean false"))
+  "A list of raw syntax keywords for GN, and some attempt at help data.")
 
 (defvar gn-builtin-regexp
-  (regexp-opt (mapcar #'car gn-builtins) 'symbols)
+  (regexp-opt (mapcar #'car gn-builtin-variables) 'symbols)
   "Regexp of GN language builtin variables.")
 
 (defvar gn-variable-regexp
-  (regexp-opt (mapcar #'car gn-variables) 'symbols)
+  (regexp-opt (mapcar #'car gn-target-variables) 'symbols)
   "Regexp of GN language settable target variables.")
 
+(defvar gn-builtin-or-variable-regexp
+  (regexp-opt (mapcar #'car
+                      (cl-concatenate 'list
+                                      gn-builtin-variables
+                                      gn-target-variables))
+              'symbols)
+  "Regexp of GN language known variables of any type.")
+
 (defvar gn-keyword-regexp
-  (regexp-opt '("if" "else" "true" "false") 'symbols)
+  (regexp-opt (mapcar #'car
+                      (cl-concatenate 'list
+                                      gn-target-declarations
+                                      gn-buildfile-functions
+                                      gn-raw-syntax-keywords))
+              'symbols)
   "Regexp of GN language keywords.")
 
 (defvar gn-integer-regexp
@@ -289,6 +360,7 @@ Use `gn-idle-help` to disable this entirely."
     ("^[^#]*?\\(:\\)"     (1 'gn-operator-face t))
     ("\\(\t+\\)"          (1 'gn-tab-face t))
     ("TODO([^)]+)"        (0 'gn-warning-face t))
+    ("|[0-9A-Za-z_]+|"    (0 'gn-warning-face t))
     ("\\(?:https?://\\)?\\(?:crbug\\.com\\|github\\.com\\(?:/[-0-9A-Za-z_]+\\)\\{2\\}/issues\\)/[0-9]+"
      (0 'gn-warning-face t)))
   "Keywords used by gn-mode font-locking.")
@@ -296,9 +368,9 @@ Use `gn-idle-help` to disable this entirely."
 (defvar gn-mode-syntax-table
   (let ((st (make-syntax-table)))
     (modify-syntax-entry '(?! . ?~) "." st)
-    (modify-syntax-entry '(?A . ?Z) "_" st)
-    (modify-syntax-entry '(?a . ?z) "_" st)
-    (modify-syntax-entry '(?0 . ?9) "_" st)
+    (modify-syntax-entry '(?A . ?Z) "w" st)
+    (modify-syntax-entry '(?a . ?z) "w" st)
+    (modify-syntax-entry '(?0 . ?9) "w" st)
     (modify-syntax-entry ?_ "_" st)
     (modify-syntax-entry ?\  "-" st)
     (modify-syntax-entry ?\t "." st)
@@ -353,14 +425,14 @@ are currently mis-indented.  Placing the whole structure on one
 line, or even just the leading [ will work correctly."
   (save-excursion
     (let ((s (progn
-	       (goto-char start)
-	       (point)))
-	  (e (progn
-	       (goto-char end)
-	       (if (bolp)
-		   (skip-chars-forward "\t )]}")
-		 (end-of-line))
-	       (point))))
+               (goto-char start)
+               (point)))
+          (e (progn
+               (goto-char end)
+               (if (bolp)
+                   (skip-chars-forward "\t )]}")
+                 (end-of-line))
+               (point))))
       (cl-loop
        with dangling-operator = nil
        initially (goto-char s)
@@ -398,12 +470,12 @@ correct."
   (interactive "*")
   (save-excursion
     (let* ((bol (progn (beginning-of-line) (point)))
-	   (eol (progn (end-of-line) (point)))
-	   (nest (gn-region-balance (point-min) bol))
-	   (goal (* gn-basic-indent nest))
-	   (delta (- goal (current-indentation))))
+           (eol (progn (end-of-line) (point)))
+           (nest (gn-region-balance (point-min) bol))
+           (goal (* gn-basic-indent nest))
+           (delta (- goal (current-indentation))))
       (when (and (>= goal 0) (not (zerop delta)))
-	(indent-rigidly bol eol delta)))))
+        (indent-rigidly bol eol delta)))))
 
 (defun gn-previous-balance ()
   "Determine the previous indent level.
@@ -417,22 +489,22 @@ from the beginning of the buffer to just before the current
 line-- assuming that was indented right."
   (save-excursion
     (let* ((this-line (progn (end-of-line) (point)))
-	   (prior-start (progn
-			  (beginning-of-line)
-			  (skip-chars-backward "^[{(")
-			  (beginning-of-line)
-			  (skip-chars-forward "\t )]}")
-			  (point)))
-	   (prior-end (progn
-			(goto-char this-line)
-			(beginning-of-line)
-			(unless (bobp) (backward-char))
-			(point)))
-	   (prev-indent (progn
-			  (goto-char prior-start)
-			  (ceiling (current-indentation)
-				   gn-basic-indent)))
-	   (local-change (gn-region-balance prior-start prior-end)))
+           (prior-start (progn
+                          (beginning-of-line)
+                          (skip-chars-backward "^[{(")
+                          (beginning-of-line)
+                          (skip-chars-forward "\t )]}")
+                          (point)))
+           (prior-end (progn
+                        (goto-char this-line)
+                        (beginning-of-line)
+                        (unless (bobp) (backward-char))
+                        (point)))
+           (prev-indent (progn
+                          (goto-char prior-start)
+                          (ceiling (current-indentation)
+                                   gn-basic-indent)))
+           (local-change (gn-region-balance prior-start prior-end)))
       (+ prev-indent local-change))))
 
 (defun gn-indent-line-inductive ()
@@ -442,57 +514,147 @@ See also `gn-indent-line'."
   (interactive "*")
   (save-excursion
     (let* ((prev-bal (gn-previous-balance))
-	   (bol (progn (beginning-of-line) (point)))
-	   (eol (progn (end-of-line) (point)))
-	   (local-change (gn-region-balance bol bol))
-	   (goal (* gn-basic-indent (+ prev-bal local-change)))
-	   (delta (- goal (current-indentation))))
+           (bol (progn (beginning-of-line) (point)))
+           (eol (progn (end-of-line) (point)))
+           (local-change (gn-region-balance bol bol))
+           (goal (* gn-basic-indent (+ prev-bal local-change)))
+           (delta (- goal (current-indentation))))
       (when (and (>= goal 0) (not (zerop delta)))
-	(indent-rigidly bol eol delta)))))
+        (indent-rigidly bol eol delta)))))
 
 (defun gn-indent-region (start end)
   "Indent the region START .. END."
   (interactive "*r")
   (let ((e (min (point-max) end))
-	(garbage-collection-messages nil))
+        (garbage-collection-messages nil))
     (save-excursion
       (cl-loop
        with pr
        initially (progn
-		   (goto-char start)
-		   (gn-indent-line)
-		   (forward-line 1)
-		   (setq pr
-			 (make-progress-reporter "Indenting region..."
-						 (point) e
-						 (point) start)))
+                   (goto-char start)
+                   (gn-indent-line)
+                   (forward-line 1)
+                   (setq pr
+                         (make-progress-reporter "Indenting region..."
+                                                 (point) e
+                                                 (point) start)))
        while (< (point) e)
        do (progn
-	    (gn-indent-line-inductive)
-	    (end-of-line)
-	    (if (not (eobp)) (forward-char))
-	    (and pr (progress-reporter-update pr (min (point) e))))
+            (gn-indent-line-inductive)
+            (end-of-line)
+            (if (not (eobp)) (forward-char))
+            (and pr (progress-reporter-update pr (min (point) e))))
        finally (progn
-		 (and pr (progress-reporter-done pr))
-		 (deactivate-mark))))))
+                 (and pr (progress-reporter-done pr))
+                 (deactivate-mark))))))
 
 (defun gn-cleanup ()
   "Perform various cleanups of the buffer.
 
 This will re-indent, convert tabs to spaces, and perform general
-whitespace cleanup like trailing blank removal."
+whitespace cleanup like trailing blank removal.
+
+TODO: this could use gn format."
   (interactive "*")
   (untabify (point-min) (point-max))
   (gn-indent-region (point-min) (point-max))
   (whitespace-cleanup))
 
-;; shamelessly borrowed timer from eldoc-mode
+;; shamelessly borrowed timer from eldoc-mode and my ksp-cfg-mode
 (defvar gn-timer nil
-  "gn's timer object.")
+  "GN-mode's timer object.")
+
 (defvar gn-current-idle-delay gn-idle-delay
-  "Idle time delay in use by gn's timer.
+  "Idle time delay in use by gn-mode's timer.
 
 This is used to notice changes to `gn-idle-delay'.")
+
+(defun gn-explain-variable ()
+  "Provide context-sensitive help for a matched variable name.
+
+This assumes that we have just matched `gn-builtin-or-variable-regexp'."
+  (let* ((var-name (match-string 1))
+         (help-info (or (assoc var-name gn-builtin-variables)
+                        (assoc var-name gn-target-variables))))
+    (when help-info
+      (cl-destructuring-bind (var-type var-desc) (cdr help-info)
+        (message "GN variable %s: %s; %s"
+                 var-name var-type var-desc)))))
+
+(defun gn-explain-keyword ()
+  "Provide context-sensitive help for a matched keyword name.
+
+This assumes that we have just matched `gn-keyword-regexp'."
+  (let* ((var-name (match-string 1))
+         (help-info (or (assoc var-name gn-target-declarations)
+                        (assoc var-name gn-buildfile-functions)
+                        (assoc var-name gn-raw-syntax-keywords))))
+    (when help-info
+      (message "GN keyword %s: %s"
+               var-name (cdr help-info)))))
+
+(defun gn-show-help ()
+  "Try to display a context-relevant help message.
+
+Looks around the `point' for recognizable structures.  Ensures
+the message doesn't go to the *Messages* buffer."
+  (let ((message-log-max nil))
+    (and
+     (not (or this-command
+              executing-kbd-macro
+              (bound-and-true-p edebug-active)))
+     (save-excursion
+       ;; Well, let's see what we find.
+
+       ;; First, save match state because we're running inside an
+       ;; idle-timer event.  cf. elisp 24 manual 33.6.4.
+       (let ((match-state (match-data)))
+         (unwind-protect
+             (let* ((origin (point))
+                    (bol (progn (beginning-of-line) (point)))
+                    (eol (progn (end-of-line) (point))))
+               (goto-char origin)
+
+               ;; Backup a step if we're off the end of the line.
+               (when (and (eolp)
+                          (not (bolp)))
+                 (backward-char))
+
+               ;; Ensure we aren't still bonking our heads on the end of the buffer.
+               (when (not (eobp))
+                 ;; Backup past the boring pair-closes
+                 (skip-syntax-backward ")-" bol)
+
+                 ;; If we're looking at something that might be a symbol, find
+                 ;; the beginning.
+                 (when (memq (char-syntax (char-after)) '(?w ?_))
+                   (skip-syntax-backward "w_" bol))
+
+                 (cond
+                  ((looking-at gn-builtin-or-variable-regexp)
+                   (gn-explain-variable))
+                  ((looking-at gn-keyword-regexp)
+                   (gn-explain-keyword))
+                  (t nil))))
+           (set-match-data match-state)))))))
+
+(defun gn-schedule-timer ()
+  "Install the context-help timer.
+
+Check first to make certain it is enabled by
+`gn-show-idle-help' and not already running.  Adjust delay
+time if already running and the `gn-idle-delay' has
+changed."
+  (or (not gn-show-idle-help)
+      (and gn-timer
+           (memq gn-timer timer-idle-list))
+      (setq gn-timer
+            (run-with-idle-timer
+             gn-idle-delay nil
+             (lambda () (gn-show-help)))))
+  (cond ((not (= gn-idle-delay gn-current-idle-delay))
+         (setq gn-current-idle-delay gn-idle-delay)
+         (timer-set-idle-time gn-timer gn-idle-delay t))))
 
 (defun gn-clear-message ()
   "Clear the message display, if any."
@@ -513,10 +675,10 @@ This is used to notice changes to `gn-idle-delay'.")
 
   ;; already buffer-local when set
   (setq font-lock-defaults  `(gn-keywords nil nil nil)
-	indent-tabs-mode     nil
-	tab-width            8
-	local-abbrev-table   gn-mode-abbrev-table
-	case-fold-search     t)
+        indent-tabs-mode     nil
+        tab-width            8
+        local-abbrev-table   gn-mode-abbrev-table
+        case-fold-search     t)
   (set-syntax-table gn-mode-syntax-table)
 
   ;; make buffer-local for our purposes
@@ -529,17 +691,21 @@ This is used to notice changes to `gn-idle-delay'.")
        #'gn-indent-region)
   (set (make-local-variable 'electric-indent-chars)
        (cl-union '(?\( ?\) ?\[ ?\] ?\{ ?\} ?,)
-		 electric-indent-chars))
+                 electric-indent-chars))
 
-;;  (add-hook (make-local-variable 'post-command-hook)
-;;	    #'gn-schedule-timer nil t)
+  (add-hook (make-local-variable 'post-command-hook)
+            #'gn-schedule-timer nil t)
   (add-hook (make-local-variable 'pre-command-hook)
-	    #'gn-clear-message nil t)
+            #'gn-clear-message nil t)
   (add-hook (make-local-variable 'before-save-hook)
-	    #'gn-maybe-cleanup-on-save)
+            #'gn-maybe-cleanup-on-save)
   (when gn-cleanup-on-load
     (gn-cleanup)))
 
 (provide 'gn-mode)
 
 ;;; gn-mode.el ends here
+
+;; Local Variables:
+;; indent-tabs-mode: nil
+;; End:

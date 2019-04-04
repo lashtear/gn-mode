@@ -1,4 +1,4 @@
-;;; gn-mode.el --- major mode for editing GN (generate ninja) files
+;;; gn-mode.el --- major mode for editing GN (generate ninja) files -*- lexical-binding: t; -*-
 
 ;; Copyright (c) 2018-2019 Emily Backes
 
@@ -6,8 +6,8 @@
 ;; Maintainer: Emily Backes <lucca@accela.net>
 ;; Created: 12 November 2018
 
-;; Version: 0.1
-;; Package-Version: 0.1
+;; Version: 0.2
+;; Package-Version: 0.2
 ;; Keywords: data
 ;; URL: http://github.com/lashtear/gn-mode
 ;; Homepage: http://github.com/lashtear/gn-mode
@@ -434,7 +434,6 @@ line, or even just the leading [ will work correctly."
                  (end-of-line))
                (point))))
       (cl-loop
-       with dangling-operator = nil
        initially (goto-char s)
        do (skip-chars-forward "^{}[]()#" end)
        while (< (point) e)
@@ -611,8 +610,7 @@ the message doesn't go to the *Messages* buffer."
        (let ((match-state (match-data)))
          (unwind-protect
              (let* ((origin (point))
-                    (bol (progn (beginning-of-line) (point)))
-                    (eol (progn (end-of-line) (point))))
+                    (bol (progn (beginning-of-line) (point))))
                (goto-char origin)
 
                ;; Backup a step if we're off the end of the line.

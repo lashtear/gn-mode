@@ -6,8 +6,8 @@
 ;; Maintainer: Emily Backes <lucca@accela.net>
 ;; Created: 12 November 2018
 
-;; Version: 0.2
-;; Package-Version: 0.2
+;; Version: 0.3
+;; Package-Version: 0.3
 ;; Keywords: data
 ;; URL: http://github.com/lashtear/gn-mode
 ;; Homepage: http://github.com/lashtear/gn-mode
@@ -62,19 +62,19 @@
   :prefix "gn-")
 
 (defcustom gn-basic-indent 2
-  "Indentation of GN structures"
+  "Indentation of GN structures."
   :type 'integer
   :group 'gn
   :safe t)
 
 (defcustom gn-cleanup-on-load nil
-  "Run gn-cleanup on load for indentation."
+  "Run ‘gn-cleanup’ on load for indentation."
   :type 'boolean
   :group 'gn
   :safe t)
 
 (defcustom gn-cleanup-on-save nil
-  "Run gn-cleanup on save for indentation."
+  "Run ‘gn-cleanup’ on save for indentation."
   :type 'boolean
   :group 'gn
   :safe t)
@@ -363,7 +363,7 @@ Use `gn-idle-help` to disable this entirely."
     ("|[0-9A-Za-z_]+|"    (0 'gn-warning-face t))
     ("\\(?:https?://\\)?\\(?:crbug\\.com\\|github\\.com\\(?:/[-0-9A-Za-z_]+\\)\\{2\\}/issues\\)/[0-9]+"
      (0 'gn-warning-face t)))
-  "Keywords used by gn-mode font-locking.")
+  "Keywords used by ‘gn-mode’ font-locking.")
 
 (defvar gn-mode-syntax-table
   (let ((st (make-syntax-table)))
@@ -387,17 +387,17 @@ Use `gn-idle-help` to disable this entirely."
     (modify-syntax-entry ?$ "'" st)
     (modify-syntax-entry ?\\ "\\" st)
     st)
-  "Syntax table used in gn-mode buffers.")
+  "Syntax table used in ‘gn-mode’ buffers.")
 
 (defvar gn-mode-abbrev-table nil
-  "Abbreviation table used in gn-mode buffers.")
+  "Abbreviation table used in ‘gn-mode’ buffers.")
 (define-abbrev-table 'gn-mode-abbrev-table '())
 
 (defvar gn-mode-map
   (let ((map (make-sparse-keymap "gn mode")))
     (define-key map "\C-c\C-c" 'comment-region)
     map)
-  "Keymap used in gn-mode buffers.")
+  "Keymap used in ‘gn-mode’ buffers.")
 
 (defun gn-region-balance (start end)
   "Determine the structural balance across the described region.

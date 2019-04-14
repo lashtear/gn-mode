@@ -10,9 +10,10 @@ A major-mode for editing GN (ninja generator) config files in Emacs.  Files of t
 * Indentation - as correct as feasible without a complete parser
 * Context-sensitive-help - keywords and variables only for now
 
-## Changes
+## Changes in 0.4
 
-* First release!
+* Fixed indentation hangs with evil-mode motion control.
+* Fixed indentation text removal or hangs with over-indented regions at the end of the buffer.
 
 ## To-Do features
 

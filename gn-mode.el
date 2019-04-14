@@ -6,13 +6,13 @@
 ;; Maintainer: Emily Backes <lucca@accela.net>
 ;; Created: 12 November 2018
 
-;; Version: 0.3
-;; Package-Version: 0.3
+;; Version: 0.4
+;; Package-Version: 0.4
 ;; Keywords: data
 ;; URL: http://github.com/lashtear/gn-mode
 ;; Homepage: http://github.com/lashtear/gn-mode
 ;; Package: gn-mode
-;; Package-Requires: ((cl-lib "0.5"))
+;; Package-Requires: ((emacs "24") (cl-lib "0.5"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -524,28 +524,28 @@ See also `gn-indent-line'."
 (defun gn-indent-region (start end)
   "Indent the region START .. END."
   (interactive "*r")
-  (let ((e (min (point-max) end))
-        (garbage-collection-messages nil))
-    (save-excursion
-      (cl-loop
-       with pr
-       initially (progn
-                   (goto-char start)
-                   (gn-indent-line)
-                   (forward-line 1)
-                   (setq pr
-                         (make-progress-reporter "Indenting region..."
-                                                 (point) e
-                                                 (point) start)))
-       while (< (point) e)
-       do (progn
-            (gn-indent-line-inductive)
-            (end-of-line)
-            (if (not (eobp)) (forward-char))
-            (and pr (progress-reporter-update pr (min (point) e))))
-       finally (progn
-                 (and pr (progress-reporter-done pr))
-                 (deactivate-mark))))))
+  (let ((garbage-collection-messages nil))
+    (cl-symbol-macrolet ((work-end (min end (point-max))))
+      (save-excursion
+        (cl-loop
+         with pr
+         initially (progn
+                     (goto-char start)
+                     (gn-indent-line)
+                     (forward-line 1)
+                     (setq pr
+                           (make-progress-reporter "Indenting region..."
+                                                   (point) work-end
+                                                   (point) start)))
+         while (< (point) work-end)
+         do (progn
+              (gn-indent-line-inductive)
+              (end-of-line)
+              (if (not (eobp)) (forward-line))
+              (and pr (progress-reporter-update pr (min (point) work-end))))
+         finally (progn
+                   (and pr (progress-reporter-done pr))
+                   (deactivate-mark)))))))
 
 (defun gn-cleanup ()
   "Perform various cleanups of the buffer.

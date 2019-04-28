@@ -1,6 +1,6 @@
 # GN-mode
 
-[![BSD3](https://img.shields.io/badge/license-BSD3-43cd80.svg)](LICENSE.md)
+[![MELPA](https://melpa.org/packages/gn-mode-badge.svg)](https://melpa.org/#/gn-mode) [![BSD3](https://img.shields.io/badge/license-BSD3-43cd80.svg)](LICENSE.md)
 
 A major-mode for editing GN (ninja generator) config files in Emacs.  Files of this type (e.g. BUILD.gn or *.gni) are common in Chromium-derived projects like Chrome and (Anaheim) Edge.
 

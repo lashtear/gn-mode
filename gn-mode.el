@@ -6,8 +6,8 @@
 ;; Maintainer: Emily Backes <lucca@accela.net>
 ;; Created: 12 November 2018
 
-;; Version: 0.4
-;; Package-Version: 0.4
+;; Version: 0.4.1
+;; Package-Version: 0.4.1
 ;; Keywords: data
 ;; URL: http://github.com/lashtear/gn-mode
 ;; Homepage: http://github.com/lashtear/gn-mode
